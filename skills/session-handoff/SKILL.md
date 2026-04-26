@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: Use when the user asks to create, migrate, resume, or design an AI session handoff; when context is nearly full; or when a long-running task needs a local handoff snapshot outside the project directory. Supports both general long-running work and code project handoffs.
+description: 用于明确要求创建 AI 会话交接的场景：迁移当前 session、做会话交接、创建/生成交接快照、生成交接文档，或准备给新 session 使用的交接提示词。Creates local AI session handoff snapshots for code projects and general long-running work.
 ---
 
 # session-handoff
@@ -18,7 +18,7 @@ Create AI session handoff snapshots in a local handoff folder, not in the projec
 
 ## Create A Handoff
 
-When the user asks to migrate the current session, create a handoff, or prepare a new-session prompt:
+When the user explicitly asks to migrate the current session, create a handoff, write handoff documents, or prepare a new-session prompt:
 
 1. Run the creation script:
 
@@ -56,9 +56,11 @@ For non-code work, load `references/profiles/general.md` only if the generic sec
 
 5. Return the short prompt from `next-session-prompt.md` to the user.
 
-## Resume From A Handoff
+## Manual Restore Reference
 
-When the user gives a handoff directory and asks to resume:
+The generated `next-session-prompt.md` is self-contained: it tells the new session which resume rules and handoff directory to read. A new session does not need this skill to trigger when the user pastes that prompt.
+
+Use this section only if the user explicitly invokes this skill while providing a concrete handoff directory:
 
 1. Read the resume rules under the handoff folder, usually `<handoff_folder>/protocol/NEW_SESSION_PROTOCOL.md`.
 2. Read the handoff directory's `START_HERE.md` and every file it lists, including `manifest.json`, `handoff.md`, `ledger.md`, `brief.md`, `access.md`, `secret-decisions.md`, and `verification.md`.

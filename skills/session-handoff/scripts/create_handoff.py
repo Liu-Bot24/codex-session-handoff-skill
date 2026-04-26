@@ -371,9 +371,9 @@ TODO
 
 
 def template_prompt(manifest: dict[str, Any], handoff_dir: Path) -> str:
-    return f"""你现在接手一个已经生成的会话交接。
+    return f"""你现在要恢复一个已经生成的会话交接。
 
-请先读取接手规则：
+请先读取恢复规则：
 
 {manifest["protocol_paths"]["new_session"]}
 
@@ -381,7 +381,7 @@ def template_prompt(manifest: dict[str, Any], handoff_dir: Path) -> str:
 
 {handoff_dir}
 
-按接手规则完成第一轮检查后，再继续执行。第一轮先反馈：已读取哪些文件、上一 session 主要做了什么（依据 ledger.md，并和 handoff.md 交叉核对）、当前工作目录是否是同一个项目或任务、权限/密钥/授权文件/登录态缺口、还没有确认或可能已经过期的信息、阻塞项、下一步安全动作。
+按恢复规则完成第一轮检查后，再继续执行。第一轮先反馈：已读取哪些文件、上一 session 主要做了什么（依据 ledger.md，并和 handoff.md 交叉核对）、当前工作目录是否是同一个项目或任务、权限/密钥/授权文件/登录态缺口、还没有确认或可能已经过期的信息、阻塞项、下一步安全动作。
 """
 
 
