@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Handoff"
+  short_description: "Create centralized AI session handoff snapshots"
+  default_prompt: "Use $session-handoff to create a centralized handoff snapshot for the current long-running task and return the short prompt for the next session."
