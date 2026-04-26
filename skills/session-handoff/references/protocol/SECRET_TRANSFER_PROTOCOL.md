@@ -1,23 +1,23 @@
-# Secret Transfer Protocol
+# Secret Transfer Rules
 
-This protocol decides how secrets and permissions survive a session handoff.
+These rules decide how secrets and permissions survive a session handoff.
 
 ## Categories
 
 Record access items as one of these:
 
-- `index-only`: a safe reference such as an environment variable name, file path, SSH config host, CLI profile, keychain item, password manager item, or browser session.
+- `reference-only`: a safe reference such as an environment variable name, file path, SSH config host, CLI profile, keychain item, password manager item, or browser session.
 - `plaintext-in-context`: a secret value appeared directly in the current chat/session context.
-- `temporary-local-secret`: a secret appears to be stored in a temporary project-local `.md`, `.txt`, or similar file that may be deleted during migration.
+- `temporary-local-secret`: a secret appears to be stored in a temporary `.md`, `.txt`, or similar file inside the current project directory and may be deleted during migration.
 - `missing-required`: the next session needs the secret or authorization, but it is not available.
 - `not-needed-now`: known access exists but is not needed for the next step.
 
 ## Default Rules
 
 - Do not write plaintext secrets by default.
-- `access.md` stores indexes and safe usage instructions, not secret values.
+- `access.md` stores safe references and usage instructions, not secret values.
 - `secret-decisions.md` stores the handling decision for each sensitive item.
-- System credential locations are indexes and usually do not need user confirmation:
+- System credential locations are safe references and usually do not need user confirmation:
   - SSH key paths,
   - SSH config hosts,
   - keychain items,
@@ -32,7 +32,7 @@ Record access items as one of these:
 Ask the user before writing a plaintext value anywhere when:
 
 - the secret value is present directly in the current context,
-- the secret is in a temporary project-local plaintext file,
+- the secret is in a temporary plaintext file inside the current project directory,
 - the user asks to make a secret available to a future session,
 - losing the current directory could lose the only copy of the secret.
 

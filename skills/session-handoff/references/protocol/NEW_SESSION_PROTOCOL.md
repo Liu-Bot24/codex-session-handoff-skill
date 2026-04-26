@@ -1,10 +1,10 @@
-# New Session Protocol
+# New Session Resume Rules
 
-Use this protocol when resuming from a centralized session handoff.
+Use these rules when resuming from a session handoff.
 
 ## Read Order
 
-1. Read this protocol.
+1. Read these rules.
 2. Read the handoff directory's `START_HERE.md`.
 3. Read every file listed in `START_HERE.md` before the first pickup report.
 4. At minimum, the handoff directory must include `manifest.json`, `handoff.md`, `ledger.md`, `brief.md`, `access.md`, `secret-decisions.md`, and `verification.md`.
@@ -15,9 +15,9 @@ If any required file is missing or unreadable, report it as a handoff integrity 
 
 Before changing files, running risky commands, publishing, deleting, restarting, committing, or migrating anything, provide a short pickup report:
 
-- Which protocol and handoff files were read.
+- Which resume rules and handoff files were read.
 - What the previous session did, summarized from `ledger.md` and cross-checked against `handoff.md`.
-- Whether the current working directory matches the handoff's project identity.
+- Whether the current working directory is the same project or task described by the handoff.
 - Which facts are verified, stale, unverified, or known expired.
 - Missing secrets, authorization files, login state, browser session, CLI profile, or access.
 - What each missing access item is for and what it blocks.
@@ -28,11 +28,11 @@ Before changing files, running risky commands, publishing, deleting, restarting,
 
 The handoff's `source_root` is where the previous session created the handoff. It is not automatically the correct root for this session.
 
-Use the current working directory as `PROJECT_ROOT` only after identity verification:
+Use the current working directory as `PROJECT_ROOT` only after checking that it is the same project or task:
 
 - For git projects, compare remote URL, repo root markers, branch context, and relevant manifest files.
-- For non-git work, compare project name, durable paths, key resources, and the handoff's stated identity.
-- If identity does not match, explain the mismatch and ask the user whether to switch directories.
+- For non-git work, compare project name, durable paths, key resources, and the handoff summary.
+- If the current directory does not match, explain the mismatch and ask the user whether to switch directories.
 
 Use logical paths such as `PROJECT_ROOT/...` in reasoning. Treat absolute paths from older sessions as historical unless reverified.
 
@@ -50,7 +50,7 @@ In the first response, report missing access if any of these are absent or stale
 - keychain or password manager item,
 - API key, token, cookie, password, private key, or OAuth refresh token.
 
-Do not ask the user to restate access information already indexed in `access.md`.
+Do not ask the user to restate access information already recorded in `access.md`.
 Do not print, copy, summarize, or leak plaintext secrets.
 
 If access is missing, say what is missing, what it is used for, what is blocked, and whether there is a safe alternative.

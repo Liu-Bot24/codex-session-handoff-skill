@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a centralized immutable AI session handoff scaffold."""
+"""Create a local immutable AI session handoff scaffold."""
 
 from __future__ import annotations
 
@@ -45,11 +45,11 @@ def run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
         return 1, "", str(exc)
 
 
-def slug(value: str, fallback: str) -> str:
+def slug(value: str, fallback: str, max_length: int = 48) -> str:
     value = value.strip().lower()
     value = re.sub(r"[^a-z0-9._-]+", "-", value)
     value = re.sub(r"-{2,}", "-", value).strip("-._")
-    return value[:48] or fallback
+    return value[:max_length] or fallback
 
 
 def short_hash(value: str, length: int = 12) -> str:
@@ -184,7 +184,7 @@ Source root at handoff: `{manifest["source_root"]}`
 7. `secret-decisions.md`
 8. `verification.md`
 
-Follow the fixed protocol first. Treat this directory as the source of truth for this handoff snapshot.
+Follow the resume rules first. Treat this directory as the source of truth for this handoff snapshot.
 """
 
 
@@ -199,7 +199,7 @@ def template_handoff(manifest: dict[str, Any]) -> str:
 - Profile: {manifest["profile"]}
 - Project: {manifest["project_short_name"]}
 - Source root at handoff: `{manifest["source_root"]}`
-- Project fingerprint: `{manifest["project_fingerprint_kind"]}:{manifest["project_fingerprint"]}`
+- Project check id: `{manifest["project_fingerprint_kind"]}:{manifest["project_fingerprint"]}`
 
 ## Human-Readable Session Summary
 
@@ -280,14 +280,14 @@ TODO
 
 
 def template_access(manifest: dict[str, Any]) -> str:
-    return f"""# Access Index
+    return f"""# Access And Credentials
 
 ## Handoff Metadata
 
 - Handoff ID: `{manifest["handoff_id"]}`
 - Project: {manifest["project_short_name"]}
 
-This file records access indexes and permission gaps. Do not write plaintext secrets here.
+This file records where required credentials, logins, and permissions can be found. Do not write plaintext secrets here.
 
 ## Access Overview
 
@@ -310,7 +310,7 @@ TODO
 
 ## Safe Access Instructions
 
-- Use indexes from this file before asking the user to repeat information.
+- Use the references in this file before asking the user to repeat information.
 - Do not print secret values.
 - Do not copy secrets into chat.
 - Do not write plaintext secrets to tracked files.
@@ -329,9 +329,9 @@ Follow `{manifest["protocol_paths"]["secret_transfer"]}`.
 
 ## Decision Table
 
-| Label | Category | Purpose | Source / Index | Decision | Blocking? | Notes |
+| Label | Category | Purpose | Source / Reference | Decision | Blocking? | Notes |
 |---|---|---|---|---|---|---|
-| TODO | index-only / plaintext-in-context / temporary-local-secret / missing-required / not-needed-now | TODO | TODO | TODO | TODO | TODO |
+| TODO | reference-only / plaintext-in-context / temporary-local-secret / missing-required / not-needed-now | TODO | TODO | TODO | TODO | TODO |
 
 ## Pending User Decisions
 
@@ -373,7 +373,7 @@ TODO
 def template_prompt(manifest: dict[str, Any], handoff_dir: Path) -> str:
     return f"""你现在接手一个已经生成的会话交接。
 
-请先读取固定接手规范：
+请先读取接手规则：
 
 {manifest["protocol_paths"]["new_session"]}
 
@@ -381,7 +381,7 @@ def template_prompt(manifest: dict[str, Any], handoff_dir: Path) -> str:
 
 {handoff_dir}
 
-按规范完成第一轮接手检查后，再继续执行。第一轮先反馈：已读取哪些文件、上一 session 主要做了什么（依据 ledger.md，并和 handoff.md 交叉核对）、当前工作目录是否匹配项目身份、权限/secret/授权文件/登录态缺口、未核验或可能过期的信息、阻塞项、下一步安全动作。
+按接手规则完成第一轮检查后，再继续执行。第一轮先反馈：已读取哪些文件、上一 session 主要做了什么（依据 ledger.md，并和 handoff.md 交叉核对）、当前工作目录是否是同一个项目或任务、权限/密钥/授权文件/登录态缺口、还没有确认或可能已经过期的信息、阻塞项、下一步安全动作。
 """
 
 
@@ -399,12 +399,12 @@ def create_handoff(args: argparse.Namespace) -> dict[str, Any]:
     profile = detect_profile(project_root, args.profile)
     info = project_info(project_root, args.title, profile)
     session_id = get_session_id(args.session_id)
-    session_short = slug(session_id or "", "none")[:16] if session_id else f"anon{random.randint(0, 0xFFFFFF):06x}"
-    agent = slug(args.agent, "agent")
+    session_short = slug(session_id or "", "none", 24) if session_id else f"anon{random.randint(0, 0xFFFFFF):06x}"
+    agent = slug(args.agent, "agent", 24)
     now = dt.datetime.now().astimezone()
     timestamp = now.strftime("%Y%m%d-%H%M%S")
-    handoff_id = f"{timestamp}-{agent}-{info['project_short_name']}-{session_short}"
-    handoff_id = slug(handoff_id, timestamp)
+    project_part = slug(info["project_short_name"], "work", 40)
+    handoff_id = f"{timestamp}-{agent}-{project_part}-{session_short}"
     handoff_dir = handoff_home / "handoffs" / now.strftime("%Y") / now.strftime("%m") / handoff_id
     handoff_dir.mkdir(parents=True, exist_ok=False)
 
@@ -423,7 +423,7 @@ def create_handoff(args: argparse.Namespace) -> dict[str, Any]:
             "secret_transfer": str(handoff_home / "protocol" / "SECRET_TRANSFER_PROTOCOL.md"),
             "profile": str(handoff_home / "protocol" / "profiles" / f"{profile}.md"),
         },
-        "resume_policy": "Read fixed protocol, read this handoff, verify project identity, then bind current working directory as PROJECT_ROOT if it matches.",
+        "resume_policy": "Read resume rules, read this handoff, verify the current directory is the same project or task, then bind it as PROJECT_ROOT if it matches.",
         **info,
     }
 
@@ -471,7 +471,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--title", default=None, help="Short human-readable title.")
     parser.add_argument("--session-id", default=None, help="Stable host session id, if available.")
     parser.add_argument("--profile", choices=("auto", "code", "general"), default="auto")
-    parser.add_argument("--refresh-protocol", action="store_true", help="Overwrite protocol files in handoff home from skill references.")
+    parser.add_argument("--refresh-protocol", action="store_true", help="Overwrite resume-rule files in the handoff folder from skill references.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON only.")
     return parser.parse_args(argv)
 

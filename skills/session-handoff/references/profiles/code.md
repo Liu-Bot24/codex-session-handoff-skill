@@ -34,14 +34,14 @@ In addition to the core handoff sections, include:
 - Tests/checks not run and why.
 - Known failing checks and suspected cause.
 - Build/dev server state if relevant.
-- Configuration and secret indexes needed for local execution.
+- Configuration and secret references needed for local execution.
 - Rollback notes for risky code/config/data changes.
 
 ## First Resume Checks
 
 The next session should verify:
 
-- current directory matches the project identity,
+- current directory is the same project,
 - branch and dirty worktree still match the handoff,
 - required dependencies or services are available,
 - required access items from `access.md` are present,

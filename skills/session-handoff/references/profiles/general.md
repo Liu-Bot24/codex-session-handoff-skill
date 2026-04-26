@@ -12,7 +12,7 @@ Capture the current state of the durable objects that matter for continuation:
 - important files, documents, pages, systems, accounts, or resources,
 - non-sensitive entry points or identifiers,
 - status of relevant external systems if they can be checked safely,
-- access indexes and permission gaps,
+- where required credentials, logins, and permissions can be found,
 - decisions made,
 - failed attempts,
 - next safe action.
