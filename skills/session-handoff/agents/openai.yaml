@@ -1,4 +1,4 @@
 interface:
-  display_name: "会话交接 Session Handoff"
+  display_name: "Session Handoff"
   short_description: "创建本机 AI 会话交接快照"
   default_prompt: "使用 $session-handoff 为当前长任务创建本机会话交接快照，并返回给新 session 使用的简短交接提示词。"
