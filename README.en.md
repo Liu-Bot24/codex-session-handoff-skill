@@ -14,6 +14,7 @@ This skill turns the current state into an independent handoff snapshot stored i
 
 - Create a handoff snapshot when a Codex session is running out of context
 - Keep repeated handoffs in one local place instead of scattering them across project directories
+- Track repeated handoffs for the same long-running work through a local index
 - Record source directory, git state, validation results, and next actions for code projects
 - Record goals, resources, required access, and pending work for non-code long-running tasks
 - Let the next session report what the previous session did, what is missing, and what should happen next in its first reply

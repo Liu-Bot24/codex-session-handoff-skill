@@ -7,7 +7,8 @@ Use these rules when resuming from a session handoff.
 1. Read these rules.
 2. Read the handoff directory's `START_HERE.md`.
 3. Read every file listed in `START_HERE.md` before the first pickup report.
-4. At minimum, the handoff directory must include `manifest.json`, `handoff.md`, `ledger.md`, `brief.md`, `access.md`, `secret-decisions.md`, and `verification.md`.
+4. Read the active profile listed in `START_HERE.md`, such as `profiles/code.md` or `profiles/general.md`.
+5. At minimum, the handoff directory must include `manifest.json`, `handoff.md`, `ledger.md`, `brief.md`, `access.md`, `secret-decisions.md`, and `verification.md`.
 
 If any required file is missing or unreadable, report it as a handoff integrity issue in the first response.
 
@@ -35,6 +36,10 @@ Use the current working directory as `PROJECT_ROOT` only after checking that it 
 - If the current directory does not match, explain the mismatch and ask the user whether to switch directories.
 
 Use logical paths such as `PROJECT_ROOT/...` in reasoning. Treat absolute paths from older sessions as historical unless reverified.
+
+## Lineage
+
+Keep `lineage_id`, `handoff_id`, and `sequence` from `manifest.json` available. If this resumed session later creates another handoff, pass the current handoff as `--parent-handoff-id` and reuse its `lineage_id`.
 
 ## Access And Secret Check
 

@@ -31,6 +31,13 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/session-handoff/scripts/create_hando
 
 Use `--profile code` for a code project, `--profile general` for non-code work, or omit it to auto-detect.
 If the host exposes a stable session id, pass it with `--session-id`.
+If the current session resumed from an existing handoff, pass that handoff's `lineage_id` and `handoff_id`:
+
+```bash
+--lineage-id "<lineage_id>" --parent-handoff-id "<handoff_id>"
+```
+
+Do not guess parentage from project name alone; omit these flags when starting an independent handoff chain.
 
 2. Perform only read-only verification before writing content.
 
@@ -65,7 +72,8 @@ Use this section only if the user explicitly invokes this skill while providing 
 1. Read the resume rules under the handoff folder, usually `<handoff_folder>/protocol/NEW_SESSION_PROTOCOL.md`.
 2. Read the handoff directory's `START_HERE.md` and every file it lists, including `manifest.json`, `handoff.md`, `ledger.md`, `brief.md`, `access.md`, `secret-decisions.md`, and `verification.md`.
 3. Bind the current working directory only after verifying it is the same project or task.
-4. In the first reply, report:
+4. Preserve `lineage_id` and `handoff_id` from `manifest.json` for any later handoff created from this resumed session.
+5. In the first reply, report:
    - files read,
    - what the previous session did, summarized from `ledger.md` and checked against `handoff.md`,
    - whether the current directory is the same project or task,
@@ -77,5 +85,5 @@ Use this section only if the user explicitly invokes this skill while providing 
 ## Implementation Notes
 
 - The script installs resume-rule files into the handoff folder if they are missing.
-- The script updates `registry.jsonl` for traceability.
+- The script updates `registry.jsonl` and `index.json` for traceability and latest-handoff lookup.
 - The script creates scaffolds only; Codex is responsible for accurate content based on current verified state.

@@ -155,6 +155,140 @@ def install_protocol(handoff_home: Path, refresh: bool = False) -> None:
             shutil.copyfile(src, dst)
 
 
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def int_value(value: Any, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def find_registry_entry(rows: list[dict[str, Any]], handoff_id: str) -> dict[str, Any] | None:
+    for row in reversed(rows):
+        if row.get("handoff_id") == handoff_id:
+            return row
+    return None
+
+
+def resolve_lineage(args: argparse.Namespace, handoff_home: Path, handoff_id: str) -> dict[str, Any]:
+    registry_rows = read_jsonl(handoff_home / "registry.jsonl")
+    explicit_lineage = getattr(args, "lineage_id", None)
+    explicit_lineage = slug(explicit_lineage, "lineage", 64) if explicit_lineage else None
+    parent_handoff_id = getattr(args, "parent_handoff_id", None) or None
+
+    parent_entry = None
+    if parent_handoff_id:
+        parent_entry = find_registry_entry(registry_rows, parent_handoff_id)
+        if parent_entry is None:
+            raise ValueError(f"parent handoff id not found in registry: {parent_handoff_id}")
+        if not parent_entry.get("lineage_id"):
+            raise ValueError(f"parent handoff is missing lineage_id: {parent_handoff_id}")
+
+    if parent_entry:
+        parent_lineage = parent_entry.get("lineage_id") or parent_entry.get("handoff_id")
+        if explicit_lineage and explicit_lineage != parent_lineage:
+            raise ValueError(
+                f"lineage id {explicit_lineage!r} does not match parent lineage {parent_lineage!r}"
+            )
+        return {
+            "lineage_id": parent_lineage,
+            "parent_handoff_id": parent_handoff_id,
+            "sequence": int_value(parent_entry.get("sequence"), 1) + 1,
+        }
+
+    if explicit_lineage:
+        previous = sorted(
+            [
+                (int_value(row.get("sequence"), 1), row.get("handoff_id"))
+                for row in registry_rows
+                if row.get("lineage_id") == explicit_lineage
+            ],
+            key=lambda item: item[0],
+        )
+        last_sequence = previous[-1][0] if previous else 0
+        last_handoff_id = previous[-1][1] if previous else None
+        return {
+            "lineage_id": explicit_lineage,
+            "parent_handoff_id": last_handoff_id,
+            "sequence": last_sequence + 1,
+        }
+
+    return {
+        "lineage_id": f"lin-{short_hash(handoff_id, 16)}",
+        "parent_handoff_id": None,
+        "sequence": 1,
+    }
+
+
+def sorted_lineage_rows(rows: list[dict[str, Any]], lineage_id: str) -> list[dict[str, Any]]:
+    return sorted(
+        [row for row in rows if row.get("lineage_id") == lineage_id],
+        key=lambda row: (int_value(row.get("sequence"), 1), row.get("created_at") or ""),
+    )
+
+
+def update_index(handoff_home: Path) -> None:
+    index_path = handoff_home / "index.json"
+    rows = read_jsonl(handoff_home / "registry.jsonl")
+    index: dict[str, Any] = {"schema_version": 1, "lineages": {}, "projects": {}}
+
+    for row in rows:
+        handoff_id = row.get("handoff_id")
+        project_fingerprint = row.get("project_fingerprint")
+        if not handoff_id or not project_fingerprint:
+            continue
+        lineage_id = row.get("lineage_id")
+        if not lineage_id:
+            continue
+        sequence = int_value(row.get("sequence"), 1)
+        lineage_rows = sorted_lineage_rows(rows, lineage_id)
+        index["lineages"][lineage_id] = {
+            "lineage_id": lineage_id,
+            "latest_handoff_id": handoff_id,
+            "latest_handoff_dir": row.get("handoff_dir"),
+            "handoff_ids": [lineage_row["handoff_id"] for lineage_row in lineage_rows if lineage_row.get("handoff_id")],
+            "parent_handoff_id": row.get("parent_handoff_id"),
+            "sequence": sequence,
+            "project_fingerprint": project_fingerprint,
+            "project_short_name": row.get("project_short_name"),
+            "title": row.get("title"),
+            "updated_at": row.get("created_at"),
+        }
+
+        project = index["projects"].setdefault(
+            project_fingerprint,
+            {
+                "project_fingerprint": project_fingerprint,
+                "project_short_name": row.get("project_short_name"),
+                "lineage_ids": [],
+            },
+        )
+        if lineage_id not in project["lineage_ids"]:
+            project["lineage_ids"].append(lineage_id)
+        project["latest_handoff_id"] = handoff_id
+        project["latest_lineage_id"] = lineage_id
+        project["updated_at"] = row.get("created_at")
+        index["updated_at"] = row.get("created_at")
+
+    write_text(index_path, json_dump(index))
+
+
 def write_text(path: Path, text: str) -> None:
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
 
@@ -172,17 +306,21 @@ Agent: {manifest["agent"]}
 Profile: {manifest["profile"]}
 Project: {manifest["project_short_name"]}
 Source root at handoff: `{manifest["source_root"]}`
+Lineage: `{manifest["lineage_id"]}`
+Sequence: {manifest["sequence"]}
+Parent handoff: `{manifest["parent_handoff_id"] or "none"}`
 
 ## Read Order
 
 1. `{manifest["protocol_paths"]["new_session"]}`
-2. `manifest.json`
-3. `handoff.md`
-4. `ledger.md`
-5. `brief.md`
-6. `access.md`
-7. `secret-decisions.md`
-8. `verification.md`
+2. `{manifest["protocol_paths"]["profile"]}`
+3. `manifest.json`
+4. `handoff.md`
+5. `ledger.md`
+6. `brief.md`
+7. `access.md`
+8. `secret-decisions.md`
+9. `verification.md`
 
 Follow the resume rules first. Treat this directory as the source of truth for this handoff snapshot.
 """
@@ -200,6 +338,9 @@ def template_handoff(manifest: dict[str, Any]) -> str:
 - Project: {manifest["project_short_name"]}
 - Source root at handoff: `{manifest["source_root"]}`
 - Project check id: `{manifest["project_fingerprint_kind"]}:{manifest["project_fingerprint"]}`
+- Lineage ID: `{manifest["lineage_id"]}`
+- Sequence: {manifest["sequence"]}
+- Parent handoff ID: `{manifest["parent_handoff_id"] or "none"}`
 
 ## Human-Readable Session Summary
 
@@ -377,9 +518,17 @@ def template_prompt(manifest: dict[str, Any], handoff_dir: Path) -> str:
 
 {manifest["protocol_paths"]["new_session"]}
 
+再读取本次交接的 profile 规则：
+
+{manifest["protocol_paths"]["profile"]}
+
 然后读取本次交接目录：
 
 {handoff_dir}
+
+如果后续还要从这次交接继续创建新交接，沿用 lineage，并把这次交接作为 parent：
+
+--lineage-id {manifest["lineage_id"]} --parent-handoff-id {manifest["handoff_id"]}
 
 按恢复规则完成第一轮检查后，再继续执行。第一轮先反馈：已读取哪些文件、上一 session 主要做了什么（依据 ledger.md，并和 handoff.md 交叉核对）、当前工作目录是否是同一个项目或任务、权限/密钥/授权文件/登录态缺口、还没有确认或可能已经过期的信息、阻塞项、下一步安全动作。
 """
@@ -405,6 +554,7 @@ def create_handoff(args: argparse.Namespace) -> dict[str, Any]:
     timestamp = now.strftime("%Y%m%d-%H%M%S")
     project_part = slug(info["project_short_name"], "work", 40)
     handoff_id = f"{timestamp}-{agent}-{project_part}-{session_short}"
+    lineage = resolve_lineage(args, handoff_home, handoff_id)
     handoff_dir = handoff_home / "handoffs" / now.strftime("%Y") / now.strftime("%m") / handoff_id
     handoff_dir.mkdir(parents=True, exist_ok=False)
 
@@ -413,9 +563,13 @@ def create_handoff(args: argparse.Namespace) -> dict[str, Any]:
         "handoff_id": handoff_id,
         "created_at": now.isoformat(timespec="seconds"),
         "agent": agent,
+        "current_session_id": session_id,
         "source_session_id": session_id,
         "title": args.title,
         "profile": profile,
+        "lineage_id": lineage["lineage_id"],
+        "parent_handoff_id": lineage["parent_handoff_id"],
+        "sequence": lineage["sequence"],
         "handoff_home": str(handoff_home),
         "handoff_dir": str(handoff_dir),
         "protocol_paths": {
@@ -447,11 +601,16 @@ def create_handoff(args: argparse.Namespace) -> dict[str, Any]:
         "project_short_name": info["project_short_name"],
         "project_fingerprint": info["project_fingerprint"],
         "source_root": info["source_root"],
+        "current_session_id": session_id,
         "source_session_id": session_id,
+        "lineage_id": lineage["lineage_id"],
+        "parent_handoff_id": lineage["parent_handoff_id"],
+        "sequence": lineage["sequence"],
         "title": args.title,
     }
     with (handoff_home / "registry.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(registry_entry, ensure_ascii=False, sort_keys=True) + "\n")
+    update_index(handoff_home)
 
     return {
         "ok": True,
@@ -470,6 +629,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--project-root", default=os.getcwd(), help="Source project/work root.")
     parser.add_argument("--title", default=None, help="Short human-readable title.")
     parser.add_argument("--session-id", default=None, help="Stable host session id, if available.")
+    parser.add_argument("--lineage-id", default=None, help="Existing lineage id for a continuing workstream.")
+    parser.add_argument("--parent-handoff-id", default=None, help="Previous handoff id when continuing a chain.")
     parser.add_argument("--profile", choices=("auto", "code", "general"), default="auto")
     parser.add_argument("--refresh-protocol", action="store_true", help="Overwrite resume-rule files in the handoff folder from skill references.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON only.")
