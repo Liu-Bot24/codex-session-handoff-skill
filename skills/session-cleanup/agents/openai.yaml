@@ -1,0 +1,4 @@
+interface:
+  display_name: "Session Cleanup"
+  short_description: "安全备份并去重 Codex 会话中重复的内嵌图片数据"
+  default_prompt: "Use $session-cleanup to safely back up and deduplicate embedded images in this Codex task."

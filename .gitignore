@@ -1,4 +1,5 @@
 .DS_Store
+DEVELOPMENT_LOG.md
 __pycache__/
 *.py[cod]
 .pytest_cache/
